@@ -10,21 +10,21 @@ servers:
   - url: https://pos-activation.iconnect.com.ph
     description: production
 tags:
-  - name: Activation
+  - name: activation_request
+    description: Everything about POS Activation Requests
+  - name: activation
     description: Everything about POS Activation
 paths:
-  /activationRequest:
+  /activation_request:
     post:
       tags:
-        - activation
+        - activation_request
       summary: Request activation for a POS
       description: |-
         Called during POS startup when it determines that it has not yet been activated
 
         The created activation request will have a status of pending
       operationId: post_activation
-      security:
-        - authorizationHeader: []
       requestBody:
         content:
           application/json:
@@ -42,52 +42,103 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvalidActivationRequestBody'
+                $ref: '#/components/schemas/InvalidRequestBody'
         '401':
           description: Unauthorized Request
         '409':
           description:  request conflicts with the current state of the server
-  /activationRequest/${requestId}:
     get:
       tags:
-        - activation
+        - activation_request
+      summary: Get all activation requests by status
+      description: |-
+        Called by the frontend to be able to display a list of activation requests
+      operationId: get_all_activation_by_status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: true
+          description: status of the activation request
+          schema:
+            type: string
+            enum:
+              - pending
+              - accepted
+              - rejected
+        - name: page
+          in: query
+          required: false
+          description: Page number of the results to fetch
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of results per page
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of activation requests with pagination information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedActivationRequestResult'
+              examples:
+                pendingExample:
+                  $ref: '#/components/examples/ActivationRequestListPendingExample'
+                acceptedExample:
+                  $ref: '#/components/examples/ActivationRequestListAcceptedExample'
+                rejectedExample:
+                  $ref: '#/components/examples/ActivationRequestListRejectedExample'
+        '401':
+          description: Unauthorized Request
+        '404':
+          description: Activation Request Not Found
+  /activation_request/${request_id}:
+    get:
+      tags:
+        - activation_request
       summary: Get activation details of a POS
       parameters:
-        - name: requestId
+        - name: request_id
           in: path
           required: true
-          description: Parameter description in CommonMark or HTML.
+          description: request identifier
           schema:
             type : string
       description: |-
         Called by the POS in the background so that it can check if the activation request it has submitted has been approved
       operationId: get_activation
-      security:
-        - authorizationHeader: []
-      
       responses:
         '200':
           description: found the activation request
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/ActivationRequestResult'
-                  - $ref: '#/components/schemas/ActivationRequestAcceptedResult'
+                  $ref: '#/components/schemas/ActivationRequestResult'
               examples:
                 pending:
                   $ref: '#/components/examples/ActivationRequestPendingExample'
                 accepted:
                   $ref: '#/components/examples/ActivationRequestAcceptedExample'
+                rejected:
+                  $ref: '#/components/examples/ActivationRequestRejectedExample'
         '401':
           description: Unauthorized Request
         '404':
           description: Activation Request Not Found
-  /activationRequest/acceptance:
+  /activation_request/acceptance:
     post:
       tags:
-        - activation
+        - activation_request
       summary: Accept a POS activation
+      security:
+        - BearerAuth: []
       requestBody:
         content:
           application/json:
@@ -100,15 +151,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ActivationRequestAcceptanceResult'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidRequestBody'
         '401':
           description: Unauthorized Request
         '404':
-          description: Activation Request Not Found
-  /activationRequest/rejection:
+          description: Activation for store Not Found
+
+  /activation_request/rejection:
     post:
       tags:
-        - activation
+        - activation_request
       summary: Reject a POS activation
+      security:
+        - BearerAuth: []
       requestBody:
         content:
           application/json:
@@ -123,20 +183,157 @@ paths:
                 $ref: '#/components/schemas/ActivationRequestRejectionResult'
         '401':
           description: Unauthorized Request
+ 
+
+  /activation:
+    get:
+      tags:
+        - activation
+      summary: returns list of activations per store
+      description: |-
+        Called by the frontend to display the activation list per store
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: store
+          in: query
+          required: true
+          description: 4-digit store number, left padded with zeroes
+          schema:
+            type: string
+            example: "0009"
+      responses:
+        '200':
+          description: returns list of activations for a store
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ActivationResult'
+              examples:
+                success:
+                  value:
+                    items:
+                      - id: "7162604e38c39a6957f874ba1f128ff1"
+                        timestamp: "2021-01-01T00:00:00Z"
+                        store: "0009"
+                        pos: "1"
+                        active: true
+                        created_on: "2021-01-01T00:00:00Z"
+                        created_by: "johndoe"
+                        last_updated_on: "2021-01-01T00:00:00Z"
+                        last_updated_by: "johndoe"
+                      - id: "f404fdb88586ede2d0ddba332a46568f"
+                        timestamp: "2021-01-01T00:00:00Z"
+                        store: "0009"
+                        pos: "2"
+                        active: false
+                        created_on: "2021-01-01T00:00:00Z"
+                        created_by: "johndoe"
+                        last_updated_on: "2021-01-01T00:00:00Z"
+                        last_updated_by: "johndoe"
+        '401':
+            description: Unauthorized Request
         '404':
-          description: Activation Request Not Found
+            description: Activation not found
+
+  /activation/${id}:
+    get:
+      tags:
+        - activation
+      summary: returns the activation details
+      description: |-
+        Called by the frontend to display the activation details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: activation identifier
+          schema:
+            type : string
+      responses:
+        '200':
+          description: returns activation details
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/ActivationResult'
+              examples:
+                active:
+                  $ref: '#/components/examples/ActivationActiveExample'
+                deactivated:
+                  $ref: '#/components/examples/ActivationDeactivatedExample'
+        '401':
+            description: Unauthorized Request
+        '404':
+            description: Activation not found
+ 
+  /activation/${id}/deactivation:
+    post:
+      tags:
+        - activation
+      summary: deactivates the activation
+      description: |-
+        Called by the frontend to deactivate the activation
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivationRequest'
+      responses:
+        '200':
+          description: deactivates the activation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeactivationRequestResult'
+        '401':
+            description: Unauthorized Request
+        '404':
+            description: Activation not found
+
+  /activation/keystore_pass_request:
+    post:
+      tags:
+        - activation
+      summary: returns the keystore credentials
+      description: |-
+        Called by the POS during startup to be able to use the certificate in the keystore
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PINRequest'
+      responses:
+        '200':
+          description: Found the keystore pass for a store and pos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PINRequestResult'
+        '401':
+          description: Unauthorized Request
+        '404':
+          description: Activation not found or expired
+ 
   
 components:
   securitySchemes:
-    authorizationHeader:
-      type: apiKey
-      name: Auhtorization
-      in: header
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     ActivationRequest:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
@@ -157,7 +354,7 @@ components:
             base64 encoded certificate signing request
           type: string
           example: "MIIC1jCCAb4CAQAwaTELMAkGA1UEBhMCUEgxDDAKBgNVBAgMA05DUjEPMA0GA1UEBwwGTUFLQVRJMRMwEQYDVQQKDApQQVlDT05ORUNUMREwDwYDVQQLDAhTRUNVUklUWTETMBEGA1UEAwwKUFNDLTAwMDktMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKhkSU6aEYpPGC7lUPrgF9gFom7OSQZG2c1A/BeiJlxq8veD0UziE8bwwd8iLVtnoEZIS2rgtCuX/F9Ityd4pxNOX8c42TtXdhjb0pvsEtcn4Z9zvQxvUf1w0Ixaih9jdspBhzcdb+NsV/y2kf/tdnyCaX9SOKmAvr0GVGi0xAj6l6heTlc1hjvp9WPj14HkMoWpOR3Isabc+wuUxiauJP2jAmg/yZgMz7qGyxw1hn5KOrOlkD0FxtWEGG/Va4VztQcR+IqzTKqwE2gI8StlNFWLDPWWzydvQdp2gBXWm9WPW/AAEU1DDceAFYNx/kDQL6gPRKR/4mZLbsy5/kQ/EmsCAwEAAaAoMCYGCSqGSIb3DQEJDjEZMBcwFQYDVR0RBA4wDIIKUFNDLTAwMDktMTANBgkqhkiG9w0BAQsFAAOCAQEAqDEG+VGfEW7lGzeD7DrhhhoiLPPh4AFyGDerfWymDUa7PjC4+w+XtPQMdi+A2a6RZOJNXNh89eB7AYJQfZ1YA5PRNtnyRZAyC/L0khX+5JcbE36kojCQi6rGImtxtu4s0vUZR16yYy0YnalrwijeY27KVifS2gNBKWYo74xz320LjryB1MTk/MDyimOyuKBzNXp4U+WJ6XPq9PokNYcNFRdIQuged+QSpFc5AvY4Z3BcwKpeB1L5lxUZSZxaBTgT/9Q4QidmuploCW1XwTB1ZlMvnwWxZEbNn+9HSB/Y8WrLC4GIOEx0qNXWuq3HbHXo+asLaiE/7mAV3eMCTp/JjA=="
-        keystorePass:
+        keystore_pass:
           description: keystore password
           type: string
           example: "b791083dae57a63e17c14fa240faf96e07f123d3c95517a9c142f3d3d023bd27"
@@ -165,10 +362,9 @@ components:
     ActivationRequestResult:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
-          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
         timestamp:
           description: timestamp
           type: string
@@ -176,51 +372,54 @@ components:
         store:
           description: 4-digit store number, left padded with zeroes
           type: string
-          example: "0009"
         pos:
           description: pos number
           type: string
-          example: "1"
         status:
           description: current status of the activation request
           type: string
-          example: "PENDING"
-
-    ActivationRequestAcceptedResult:
-      type: object
-      properties:
-        requestId:
-          description: unique request identifier, ksuid or uuid
-          type: string
-          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
-        timestamp:
-          description: timestamp
+        requested_on:
+          description: timestamp when request was received
           type: string
           format: date-time
-        store:
-          description: 4-digit store number, left padded with zeroes
+        accepted_on:
+          description: timestamp when request was accepted
           type: string
-          example: "0009"
-        pos:
-          description: pos number
+          format: date-time
+        accepted_by:
+          description: user who accepted the request
           type: string
-          example: "1"
-        status:
-          description: current status of the activation request
+          format: date-time
+        rejected_on:
+          description: timestamp when request was rejected
           type: string
-          example: "ACCEPTED"
-        cert:
-          description: |-
-            base64 encoded certificate
+          format: date-time
+        rejected_by:
+          description: user who rejected the request
           type: string
-          example: "MIIC1jCCAb4CAQAwaTELMAkGA1UEBhMCUEgxDDAKBgNVBAgMA05DUjEPMA0GA1UEBwwGTUFLQVRJMRMwEQYDVQQKDApQQVlDT05ORUNUMREwDwYDVQQLDAhTRUNVUklUWTETMBEGA1UEAwwKUFNDLTAwMDktMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKhkSU6aEYpPGC7lUPrgF9gFom7OSQZG2c1A/BeiJlxq8veD0UziE8bwwd8iLVtnoEZIS2rgtCuX/F9Ityd4pxNOX8c42TtXdhjb0pvsEtcn4Z9zvQxvUf1w0Ixaih9jdspBhzcdb+NsV/y2kf/tdnyCaX9SOKmAvr0GVGi0xAj6l6heTlc1hjvp9WPj14HkMoWpOR3Isabc+wuUxiauJP2jAmg/yZgMz7qGyxw1hn5KOrOlkD0FxtWEGG/Va4VztQcR+IqzTKqwE2gI8StlNFWLDPWWzydvQdp2gBXWm9WPW/AAEU1DDceAFYNx/kDQL6gPRKR/4mZLbsy5/kQ/EmsCAwEAAaAoMCYGCSqGSIb3DQEJDjEZMBcwFQYDVR0RBA4wDIIKUFNDLTAwMDktMTANBgkqhkiG9w0BAQsFAAOCAQEAqDEG+VGfEW7lGzeD7DrhhhoiLPPh4AFyGDerfWymDUa7PjC4+w+XtPQMdi+A2a6RZOJNXNh89eB7AYJQfZ1YA5PRNtnyRZAyC/L0khX+5JcbE36kojCQi6rGImtxtu4s0vUZR16yYy0YnalrwijeY27KVifS2gNBKWYo74xz320LjryB1MTk/MDyimOyuKBzNXp4U+WJ6XPq9PokNYcNFRdIQuged+QSpFc5AvY4Z3BcwKpeB1L5lxUZSZxaBTgT/9Q4QidmuploCW1XwTB1ZlMvnwWxZEbNn+9HSB/Y8WrLC4GIOEx0qNXWuq3HbHXo+asLaiE/7mAV3eMCTp/JjA=="
+          format: date-time
+        code:
+          type: string
+          description: return code
+          example: "200"
+        message:
+          type: string
+          description: human readable message
+          example: "OK"
+      required:
+        - request_id
+        - timestamp
+        - store
+        - pos
+        - status
+        - requested_on
 
-    InvalidActivationRequestBody:
+    InvalidRequestBody:
       type: object
       properties:
-        requestId:
+        request_id:
           type: string
-          description: requestId from the request body
+          description: request_id from the request body
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
         timestamp:
           description: timestamp
@@ -238,7 +437,7 @@ components:
     ActivationRequestAcceptanceRequest:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
           example: "60e0f8e68fc1b0bd85d51c9bcfb1273c"
@@ -246,7 +445,11 @@ components:
           description: timestamp
           type: string
           format: date-time
-        activationRequestId:
+        expires_on:
+          description: activation when request expires
+          type: string
+          format: date-time
+        activation_request_id:
           description: activation request identifier
           type: string
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
@@ -254,7 +457,7 @@ components:
     ActivationRequestAcceptanceResult:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
           example: "60e0f8e68fc1b0bd85d51c9bcfb1273c"
@@ -262,7 +465,7 @@ components:
           description: timestamp
           type: string
           format: date-time
-        activationRequestId:
+        activation_request_id:
           description: activation request identifier
           type: string
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
@@ -270,7 +473,7 @@ components:
     ActivationRequestRejectionRequest:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
           example: "60e0f8e68fc1b0bd85d51c9bcfb1273c"
@@ -278,7 +481,7 @@ components:
           description: timestamp
           type: string
           format: date-time
-        activationRequestId:
+        activation_request_id:
           description: activation request identifier
           type: string
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
@@ -286,7 +489,7 @@ components:
     ActivationRequestRejectionResult:
       type: object
       properties:
-        requestId:
+        request_id:
           description: unique request identifier, ksuid or uuid
           type: string
           example: "60e0f8e68fc1b0bd85d51c9bcfb1273c"
@@ -294,24 +497,261 @@ components:
           description: timestamp
           type: string
           format: date-time
-        activationRequestId:
+        activation_request_id:
           description: activation request identifier
           type: string
           example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
 
+    PaginatedActivationRequestResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivationRequestResult'
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 10
+        hasNextPage:
+          type: boolean
+          example: true
+
+    PINRequest:
+      type: object
+      properties:
+        request_id:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        cashier:
+          description: cashier number
+          type: string
+          example: "0019234"
+    
+    PINRequestResult:
+      type: object
+      properties:
+        request_id:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        cashier:
+          description: cashier number
+          type: string
+          example: "0019234"
+        keystore_pass:
+          description: keystore password
+          type: string
+          example: "b791083dae57a63e17c14fa240faf96e07f123d3c95517a9c142f3d3d023bd27"
+    
+    ActivationResult:
+      type: object
+      properties:
+        id:
+          description: activation identifier
+          type: string
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+        pos:
+          description: pos number
+          type: string
+        active:
+          description: activation status
+          type: boolean
+        created_on:
+          description: timestamp when activation was created
+          type: string
+          format: date-time
+        created_by:
+          description: user who created the activation
+          type: string
+        last_updated_on:
+          description: timestamp when activation was last updated
+          type: string
+          format: date-time
+        last_updated_by:
+          description: user who last updated the activation
+          type: string
+    DeactivationRequest:
+      type: object
+      properties:
+        request_id:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        activation_id:
+          description: activation identifier
+          type: string
+          example: "7162604e38c39a6957f874ba1f128ff1"
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+    DeactivationRequestResult:
+      type: object
+      properties:
+        request_id:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        activation_id:
+          description: activation identifier
+          type: string
+          example: "7162604e38c39a6957f874ba1f128ff1"
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        requested_on:
+          description: timestamp when deactivation was requested
+          type: string
+          format: date-time
+        requested_by:
+          description: user who requested the deactivation
+          type: string
+          example: "johndoe"
+
   examples:
     ActivationRequestPendingExample:
       value:
-        requestId: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
         timestamp: "2021-01-01T00:00:00Z"
         store: "0009"
         pos: "1"
         status: "PENDING"
+        requested_on: "2021-01-01T00:00:00Z"
     ActivationRequestAcceptedExample:
       value:
-        requestId: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
         timestamp: "2021-01-01T00:00:00Z"
         store: "0009"
         pos: "1"
         status: "ACCEPTED"
         cert: "MIIC1jCCAb4CAQAwaTELMAkGA1UEBhMCUEgxDDAKBgNVBAgMA05DUjEPMA0GA1UEBwwGTUFLQVRJMRMwEQYDVQQKDApQQVlDT05ORUNUMREwDwYDVQQLDAhTRUNVUklUWTETMBEGA1UEAwwKUFNDLTAwMDktMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKhkSU6aEYpPGC7lUPrgF9gFom7OSQZG2c1A/BeiJlxq8veD0UziE8bwwd8iLVtnoEZIS2rgtCuX/F9Ityd4pxNOX8c42TtXdhjb0pvsEtcn4Z9zvQxvUf1w0Ixaih9jdspBhzcdb+NsV/y2kf/tdnyCaX9SOKmAvr0GVGi0xAj6l6heTlc1hjvp9WPj14HkMoWpOR3Isabc+wuUxiauJP2jAmg/yZgMz7qGyxw1hn5KOrOlkD0FxtWEGG/Va4VztQcR+IqzTKqwE2gI8StlNFWLDPWWzydvQdp2gBXWm9WPW/AAEU1DDceAFYNx/kDQL6gPRKR/4mZLbsy5/kQ/EmsCAwEAAaAoMCYGCSqGSIb3DQEJDjEZMBcwFQYDVR0RBA4wDIIKUFNDLTAwMDktMTANBgkqhkiG9w0BAQsFAAOCAQEAqDEG+VGfEW7lGzeD7DrhhhoiLPPh4AFyGDerfWymDUa7PjC4+w+XtPQMdi+A2a6RZOJNXNh89eB7AYJQfZ1YA5PRNtnyRZAyC/L0khX+5JcbE36kojCQi6rGImtxtu4s0vUZR16yYy0YnalrwijeY27KVifS2gNBKWYo74xz320LjryB1MTk/MDyimOyuKBzNXp4U+WJ6XPq9PokNYcNFRdIQuged+QSpFc5AvY4Z3BcwKpeB1L5lxUZSZxaBTgT/9Q4QidmuploCW1XwTB1ZlMvnwWxZEbNn+9HSB/Y8WrLC4GIOEx0qNXWuq3HbHXo+asLaiE/7mAV3eMCTp/JjA=="
+        requested_on: "2021-01-01T00:00:00Z"
+        accepted_on: "2021-01-01T00:00:00Z"
+        accepted_by: "johndoe"
+    ActivationRequestRejectedExample:
+      value:
+        request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp: "2021-01-01T00:00:00Z"
+        store: "0009"
+        pos: "1"
+        status: "REJECTED"
+        requested_on: "2021-01-01T00:00:00Z"
+        rejected_on: "2021-01-01T00:00:00Z"
+        rejected_by: "johndoe"
+    ActivationRequestListPendingExample:
+      summary: pending activation requests
+      value:
+        items:
+          - request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+            timestamp: "2021-01-01T00:00:00Z"
+            store: "0009"
+            pos: "1"
+            status: "PENDING"
+            requested_on: "2021-01-01T00:00:00Z"
+        page: 1
+        pageSize: 10
+        hasNextPage: true
+    ActivationRequestListAcceptedExample:
+      summary: accepted activation requests
+      value:
+        items:
+          - request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+            timestamp: "2021-01-01T00:00:00Z"
+            store: "0009"
+            pos: "1"
+            status: "ACCEPTED"
+            cert: "MIIC1jCCAb4CAQAwaTELMAkGA1UEBhMCUEgxDDAKBgNVBAgMA05DUjEPMA0GA1UEBwwGTUFLQVRJMRMwEQYDVQQKDApQQVlDT05ORUNUMREwDwYDVQQLDAhTRUNVUklUWTETMBEGA1UEAwwKUFNDLTAwMDktMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKhkSU6aEYpPGC7lUPrgF9gFom7OSQZG2c1A/BeiJlxq8veD0UziE8bwwd8iLVtnoEZIS2rgtCuX/F9Ityd4pxNOX8c42TtXdhjb0pvsEtcn4Z9zvQxvUf1w0Ixaih9jdspBhzcdb+NsV/y2kf/tdnyCaX9SOKmAvr0GVGi0xAj6l6heTlc1hjvp9WPj14HkMoWpOR3Isabc+wuUxiauJP2jAmg/yZgMz7qGyxw1hn5KOrOlkD0FxtWEGG/Va4VztQcR+IqzTKqwE2gI8StlNFWLDPWWzydvQdp2gBXWm9WPW/AAEU1DDceAFYNx/kDQL6gPRKR/4mZLbsy5/kQ/EmsCAwEAAaAoMCYGCSqGSIb3DQEJDjEZMBcwFQYDVR0RBA4wDIIKUFNDLTAwMDktMTANBgkqhkiG9w0BAQsFAAOCAQEAqDEG+VGfEW7lGzeD7DrhhhoiLPPh4AFyGDerfWymDUa7PjC4+w+XtPQMdi+A2a6RZOJNXNh89eB7AYJQfZ1YA5PRNtnyRZAyC/L0khX+5JcbE36kojCQi6rGImtxtu4s0vUZR16yYy0YnalrwijeY27KVifS2gNBKWYo74xz320LjryB1MTk/MDyimOyuKBzNXp4U+WJ6XPq9PokNYcNFRdIQuged+QSpFc5AvY4Z3BcwKpeB1L5lxUZSZxaBTgT/9Q4QidmuploCW1XwTB1ZlMvnwWxZEbNn+9HSB/Y8WrLC4GIOEx0qNXWuq3HbHXo+asLaiE/7mAV3eMCTp/JjA=="
+            requested_on: "2021-01-01T00:00:00Z"
+            accepted_on: "2021-01-01T00:00:00Z"
+            accepted_by: "johndoe"
+        page: 1
+        pageSize: 10
+        hasNextPage: false
+    ActivationRequestListRejectedExample:
+      summary: rejected activation requests
+      value:
+        items:
+          - request_id: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+            timestamp: "2021-01-01T00:00:00Z"
+            store: "0009"
+            pos: "1"
+            status: "REJECTED"
+            requested_on: "2021-01-01T00:00:00Z"
+            rejected_on: "2021-01-01T00:00:00Z"
+            rejected_by: "johndoe"
+        page: 1
+        pageSize: 10
+        hasNextPage: false
+    ActivationActiveExample:
+      value:
+        id: "7162604e38c39a6957f874ba1f128ff1"
+        timestamp: "2021-01-01T00:00:00Z"
+        store: "0009"
+        pos: "1"
+        active: true
+        created_on: "2021-01-01T00:00:00Z"
+        created_by: "johndoe"
+        last_updated_on: "2021-01-01T00:00:00Z"
+        last_updated_by: "johndoe"
+    ActivationDeactivatedExample:
+      value:
+        id: "f404fdb88586ede2d0ddba332a46568f"
+        timestamp: "2021-01-01T00:00:00Z"
+        store: "0009"
+        pos: "1"
+        active: false
+        created_on: "2021-01-01T00:00:00Z"
+        created_by: "johndoe"
+        last_updated_on: "2021-01-01T00:00:00Z"
+        last_updated_by: "johndoe"
