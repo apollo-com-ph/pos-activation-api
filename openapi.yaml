@@ -1,0 +1,210 @@
+openapi: 3.0.0
+info:
+  title: iConnect POS Activation
+  version: 1.0.0
+  description: |-
+    This API specification is meant to be used by the iConnect POS.
+servers:
+  - url: https://pos-activation-sbx.iconnect.com.ph
+    description: sandbox 
+  - url: https://pos-activation.iconnect.com.ph
+    description: production
+tags:
+  - name: Activation
+    description: Everything about POS Activation
+paths:
+  /activation:
+    post:
+      tags:
+        - activation
+      summary: Request activation for a POS
+      description: |-
+        Called during POS startup when it determines that it has not yet been activated
+
+        The created activation request will have a status of pending
+      operationId: post_activation
+      security:
+        - authorizationHeader: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivationRequest'
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivationRequestPendingResult'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidActivationRequestBody'
+        '401':
+          description: Unauthorized Request
+        '409':
+          description:  request conflicts with the current state of the server
+  /activation/${requestId}:
+    get:
+      tags:
+        - activation
+      summary: Get activation details of a POS
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          description: Parameter description in CommonMark or HTML.
+          schema:
+            type : string
+      description: |-
+        Called by the POS in the background so that it can check if the activation request it has submitted has been approved
+      operationId: get_activation
+      security:
+        - authorizationHeader: []
+      
+      responses:
+        '200':
+          description: found the activation request
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ActivationRequestResult'
+                  - $ref: '#/components/schemas/ActivationRequestAcceptedResult'
+              examples:
+                pending:
+                  $ref: '#/components/examples/ActivationRequestPendingExample'
+                accepted:
+                  $ref: '#/components/examples/ActivationRequestAcceptedExample'
+        '401':
+          description: Unauthorized Request
+        '404':
+          description: Activation Request Not Found
+  /activation/acceptance:
+    post:
+      tags:
+        - activation
+      summary: Accept a POS activation
+  /activation/rejection:
+    post:
+      tags:
+        - activation
+      summary: Reject a POS activation
+  
+components:
+  securitySchemes:
+    authorizationHeader:
+      type: apiKey
+      name: Auhtorization
+      in: header
+  schemas:
+    ActivationRequest:
+      type: object
+      properties:
+        requestId:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        csr:
+          description: |-
+            base64 encoded certificate signing request
+          type: string
+          example: "MIIC1jCCAb4CAQAwaTELMAkGA1UEBhMCUEgxDDAKBgNVBAgMA05DUjEPMA0GA1UEBwwGTUFLQVRJMRMwEQYDVQQKDApQQVlDT05ORUNUMREwDwYDVQQLDAhTRUNVUklUWTETMBEGA1UEAwwKUFNDLTAwMDktMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKhkSU6aEYpPGC7lUPrgF9gFom7OSQZG2c1A/BeiJlxq8veD0UziE8bwwd8iLVtnoEZIS2rgtCuX/F9Ityd4pxNOX8c42TtXdhjb0pvsEtcn4Z9zvQxvUf1w0Ixaih9jdspBhzcdb+NsV/y2kf/tdnyCaX9SOKmAvr0GVGi0xAj6l6heTlc1hjvp9WPj14HkMoWpOR3Isabc+wuUxiauJP2jAmg/yZgMz7qGyxw1hn5KOrOlkD0FxtWEGG/Va4VztQcR+IqzTKqwE2gI8StlNFWLDPWWzydvQdp2gBXWm9WPW/AAEU1DDceAFYNx/kDQL6gPRKR/4mZLbsy5/kQ/EmsCAwEAAaAoMCYGCSqGSIb3DQEJDjEZMBcwFQYDVR0RBA4wDIIKUFNDLTAwMDktMTANBgkqhkiG9w0BAQsFAAOCAQEAqDEG+VGfEW7lGzeD7DrhhhoiLPPh4AFyGDerfWymDUa7PjC4+w+XtPQMdi+A2a6RZOJNXNh89eB7AYJQfZ1YA5PRNtnyRZAyC/L0khX+5JcbE36kojCQi6rGImtxtu4s0vUZR16yYy0YnalrwijeY27KVifS2gNBKWYo74xz320LjryB1MTk/MDyimOyuKBzNXp4U+WJ6XPq9PokNYcNFRdIQuged+QSpFc5AvY4Z3BcwKpeB1L5lxUZSZxaBTgT/9Q4QidmuploCW1XwTB1ZlMvnwWxZEbNn+9HSB/Y8WrLC4GIOEx0qNXWuq3HbHXo+asLaiE/7mAV3eMCTp/JjA=="
+  
+    ActivationRequestResult:
+      type: object
+      properties:
+        requestId:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        status:
+          description: current status of the activation request
+          type: string
+          example: "PENDING"
+
+    ActivationRequestAcceptedResult:
+      type: object
+      properties:
+        requestId:
+          description: unique request identifier, ksuid or uuid
+          type: string
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        store:
+          description: 4-digit store number, left padded with zeroes
+          type: string
+          example: "0009"
+        pos:
+          description: pos number
+          type: string
+          example: "1"
+        status:
+          description: current status of the activation request
+          type: string
+          example: "ACCEPTED"
+
+    InvalidActivationRequestBody:
+      type: object
+      properties:
+        requestId:
+          type: string
+          description: requestId from the request body
+          example: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp:
+          description: timestamp
+          type: string
+          format: date-time
+        code:
+          type: string
+          description: returnCode
+          example: "400"
+        message:
+          type: string
+          description: human readable message
+          example: "Invalid Request Body"
+  examples:
+    ActivationRequestPendingExample:
+      value:
+        requestId: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp: "2021-01-01T00:00:00Z"
+        store: "0009"
+        pos: "1"
+        status: "PENDING"
+    ActivationRequestAcceptedExample:
+      value:
+        requestId: "2ZTcYqW6jGaTH3o2B0Rh8wPJmoG"
+        timestamp: "2021-01-01T00:00:00Z"
+        store: "0009"
+        pos: "1"
+        status: "ACCEPTED"
