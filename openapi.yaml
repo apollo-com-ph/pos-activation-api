@@ -21,6 +21,7 @@ paths:
         - activation_request
       summary: Request activation for a POS
       description: |-
+      
         Called during POS startup when it determines that it has not yet been activated
 
         The created activation request will have a status of pending
